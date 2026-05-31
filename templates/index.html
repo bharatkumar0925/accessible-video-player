@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+   `
+<meta charset="UTF-8">
+
+<meta
+name="viewport"
+content="width=device-width, initial-scale=1.0">
+
+<title>Advanced Flask Video Player</title>
+
+<link
+rel="stylesheet"
+href="https://cdn.plyr.io/3.7.8/plyr.css"/>
+
+<style>
+
+*{
+
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+
+}
+
+body{
+
+    background:#111;
+    color:white;
+    font-family:Arial, sans-serif;
+    padding:20px;
+
+}
+
+.container{
+
+    width:90%;
+    max-width:1200px;
+    margin:auto;
+
+}
+
+h1{
+
+    text-align:center;
+    margin-bottom:25px;
+
+}
+
+.upload-box{
+
+    background:#1e1e1e;
+    padding:20px;
+    border-radius:12px;
+    margin-bottom:25px;
+
+}
+
+button{
+
+    padding:12px 20px;
+    border:none;
+    border-radius:8px;
+    cursor:pointer;
+    background:#00aaff;
+    color:white;
+    font-size:16px;
+    transition:0.3s;
+
+}
+
+button:hover{
+
+    background:#0088cc;
+
+}
+
+input[type="file"]{
+
+    color:white;
+
+}
+
+select{
+
+    padding:10px;
+    border:none;
+    border-radius:8px;
+    background:#222;
+    color:white;
+    font-size:16px;
+
+}
+
+video{
+
+    width:100%;
+    border-radius:12px;
+
+}
+
+.subtitle-panel{
+
+    margin-top:25px;
+
+}
+
+#live-subtitle{
+
+    margin-top:20px;
+    text-align:center;
+    font-size:22px;
+    min-height:40px;
+    color:white;
+
+}
+
+.sr-only{
+
+    position:absolute;
+    left:-9999px;
+
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>Advanced Flask Video Player</h1>
+
+<!-- VIDEO UPLOAD -->
+
+<div class="upload-box">
+
+<form
+method="POST"
+enctype="multipart/form-data">
+
+<h3>Select Video</h3>
+
+<br>
+
+<input
+type="file"
+name="video"
+accept="video/*"
+required>
+
+<br><br>
+
+{% if video_uploaded %}
+
+<h3>Select Audio Track</h3>
+
+<br>
+
+<select name="audio_track">
+
+{% for audio in audio_tracks %}
+
+<option value="{{ audio.index }}">
+
+{{ audio.lang }}
+
+</option>
+
+{% endfor %}
+
+</select>
+
+<br><br>
+
+{% endif %}
+
+<button type="submit">
+
+{% if video_uploaded %}
+
+Play Video
+
+{% else %}
+
+Upload Video
+
+{% endif %}
+
+</button>
+
+</form>
+
+</div>
+
+<!-- VIDEO PLAYER -->
+
+{% if output_video %}
+
+<video
+id="player"
+playsinline
+controls>
+
+<source
+src="{{ url_for(
+'static',
+filename='output/' + output_video) }}"
+type="video/mp4">
+
+<!-- EMBEDDED SUBTITLES -->
+
+{% for track in subtitle_tracks %}
+
+<track
+kind="subtitles"
+label="{{ track.lang }}"
+srclang="{{ track.lang }}"
+src="{{ url_for(
+'static',
+filename='subtitles/' + track.file) }}">
+
+{% endfor %}
+
+</video>
+
+<!-- EXTERNAL SUBTITLE -->
+
+<div class="subtitle-panel">
+
+<h3>Upload External Subtitle</h3>
+
+<br>
+
+<input
+type="file"
+id="subtitleInput"
+accept=".srt,.ass,.ssa,.vtt">
+
+<button
+type="button"
+onclick="uploadSubtitle()">
+
+Add Subtitle
+
+</button>
+
+</div>
+
+<!-- LIVE SUBTITLE -->
+
+<div id="live-subtitle"></div>
+
+<!-- SCREEN READER -->
+
+<div
+id="caption-reader"
+aria-live="assertive"
+class="sr-only">
+</div>
+
+{% endif %}
+
+</div>
+
+<!-- PLYR -->
+
+<script
+src="https://cdn.plyr.io/3.7.8/plyr.polyfilled.js">
+</script>
+
+<script>
+
+const video =
+document.getElementById("player");
+
+const captionReader =
+document.getElementById(
+    "caption-reader"
+);
+
+const liveSubtitle =
+document.getElementById(
+    "live-subtitle"
+);
+
+
+// INIT PLAYER
+
+if(video){
+
+    const player = new Plyr(
+
+        '#player',
+
+        {
+
+            controls: [
+
+                'play-large',
+                'restart',
+                'rewind',
+                'play',
+                'fast-forward',
+                'progress',
+                'current-time',
+                'duration',
+                'mute',
+                'volume',
+                'captions',
+                'settings',
+                'pip',
+                'fullscreen'
+
+            ],
+
+            settings: [
+
+                'captions',
+                'speed'
+
+            ],
+
+            speed: {
+
+                selected:1,
+
+                options:[
+                    0.5,
+                    0.75,
+                    1,
+                    1.25,
+                    1.5,
+                    1.75,
+                    2
+                ]
+
+            },
+
+            captions: {
+
+                active:true,
+                update:true
+
+            },
+
+            keyboard: {
+
+                focused:true,
+                global:true
+
+            }
+
+        }
+
+    );
+
+    // ACCESSIBILITY FOR EMBEDDED SUBS
+
+    setupAccessibility();
+
+}
+
+
+// ACCESSIBILITY FUNCTION
+
+function setupAccessibility(){
+
+    for(
+
+        let i = 0;
+
+        i < video.textTracks.length;
+
+        i++
+
+    ){
+
+        const track =
+        video.textTracks[i];
+
+        track.mode = "showing";
+
+        track.addEventListener(
+
+            "cuechange",
+
+            () => {
+
+                const cue =
+                track.activeCues[0];
+
+                if(cue){
+
+                    captionReader.textContent =
+                    cue.text;
+
+                    liveSubtitle.innerHTML =
+                    cue.text;
+
+                }
+
+            }
+
+        );
+
+    }
+
+}
+
+
+// EXTERNAL SUBTITLE UPLOAD
+
+async function uploadSubtitle(){
+
+    const fileInput =
+    document.getElementById(
+        "subtitleInput"
+    );
+
+    const file =
+    fileInput.files[0];
+
+    if(!file){
+
+        alert("Select subtitle file");
+
+        return;
+
+    }
+
+    const formData =
+    new FormData();
+
+    formData.append(
+        "subtitle",
+        file
+    );
+
+    const response =
+    await fetch(
+
+        "/upload_subtitle",
+
+        {
+
+            method:"POST",
+
+            body:formData
+
+        }
+
+    );
+
+    const data =
+    await response.json();
+
+    const track =
+    document.createElement("track");
+
+    track.kind = "subtitles";
+
+    track.label = data.lang;
+
+    track.srclang = data.lang;
+
+    track.src =
+    "/static/subtitles/" +
+    data.file;
+
+    track.default = true;
+
+    video.appendChild(track);
+
+    // WAIT FOR TRACK TO LOAD
+
+    track.addEventListener(
+
+        "load",
+
+        () => {
+
+            const textTrack =
+            video.textTracks[
+                video.textTracks.length - 1
+            ];
+
+            textTrack.mode =
+            "showing";
+
+            textTrack.addEventListener(
+
+                "cuechange",
+
+                () => {
+
+                    const cue =
+                    textTrack.activeCues[0];
+
+                    if(cue){
+
+                        captionReader.textContent =
+                        cue.text;
+
+                        liveSubtitle.innerHTML =
+                        cue.text;
+
+                    }
+
+                }
+
+            );
+
+        }
+
+    );
+
+    alert("Subtitle Added");
+
+}
+
+</script>
+
+</body>
+</html>
