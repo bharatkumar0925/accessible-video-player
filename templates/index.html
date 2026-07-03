@@ -2,527 +2,329 @@
 <html lang="en">
 
 <head>
-   `
 <meta charset="UTF-8">
-
-<meta
-name="viewport"
-content="width=device-width, initial-scale=1.0">
-
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Advanced Flask Video Player</title>
-
-<link
-rel="stylesheet"
-href="https://cdn.plyr.io/3.7.8/plyr.css"/>
+<link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css"/>
 
 <style>
 
-*{
-
-    margin:0;
-    padding:0;
-    box-sizing:border-box;
-
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
 }
 
-body{
-
-    background:#111;
-    color:white;
-    font-family:Arial, sans-serif;
-    padding:20px;
-
+body {
+    background: #111;
+    color: white;
+    font-family: Arial, sans-serif;
+    padding: 20px;
 }
 
-.container{
-
-    width:90%;
-    max-width:1200px;
-    margin:auto;
-
+.container {
+    width: 90%;
+    max-width: 1200px;
+    margin: auto;
 }
 
-h1{
-
-    text-align:center;
-    margin-bottom:25px;
-
+h1 {
+    text-align: center;
+    margin-bottom: 25px;
 }
 
-.upload-box{
-
-    background:#1e1e1e;
-    padding:20px;
-    border-radius:12px;
-    margin-bottom:25px;
-
+.upload-box {
+    background: #1e1e1e;
+    padding: 20px;
+    border-radius: 12px;
+    margin-bottom: 25px;
 }
 
-button{
-
-    padding:12px 20px;
-    border:none;
-    border-radius:8px;
-    cursor:pointer;
-    background:#00aaff;
-    color:white;
-    font-size:16px;
-    transition:0.3s;
-
+button {
+    padding: 12px 20px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    background: #00aaff;
+    color: white;
+    font-size: 16px;
+    transition: 0.3s;
 }
 
-button:hover{
-
-    background:#0088cc;
-
+button:hover {
+    background: #0088cc;
 }
 
-input[type="file"]{
-
-    color:white;
-
+input[type="file"] {
+    color: white;
 }
 
-select{
-
-    padding:10px;
-    border:none;
-    border-radius:8px;
-    background:#222;
-    color:white;
-    font-size:16px;
-
+select {
+    padding: 10px;
+    border: none;
+    border-radius: 8px;
+    background: #222;
+    color: white;
+    font-size: 16px;
 }
 
-video{
-
-    width:100%;
-    border-radius:12px;
-
+video {
+    width: 100%;
+    border-radius: 12px;
 }
 
-.subtitle-panel{
-
-    margin-top:25px;
-
+.subtitle-panel {
+    margin-top: 25px;
 }
 
-#live-subtitle{
-
-    margin-top:20px;
-    text-align:center;
-    font-size:22px;
-    min-height:40px;
-    color:white;
-
+/* ── NEW: SR toggle row ── */
+.sr-toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 16px;
 }
 
-.sr-only{
+.sr-toggle-row input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: #00aaff;
+}
 
-    position:absolute;
-    left:-9999px;
+.sr-toggle-row label {
+    font-size: 15px;
+    cursor: pointer;
+    user-select: none;
+}
+/* ── END NEW ── */
 
+#live-subtitle {
+    margin-top: 20px;
+    text-align: center;
+    font-size: 22px;
+    min-height: 40px;
+    color: white;
+}
+
+.sr-only {
+    position: absolute;
+    left: -9999px;
 }
 
 </style>
-
 </head>
 
 <body>
-
 <div class="container">
 
-<h1>Advanced Flask Video Player</h1>
+    <h1>Advanced Flask Video Player</h1>
 
-<!-- VIDEO UPLOAD -->
+    <!-- VIDEO UPLOAD -->
+    <div class="upload-box">
+        <form method="POST" enctype="multipart/form-data">
+            <h3>Select Video</h3>
+            <br>
+            <input type="file" name="video" accept="video/*" required>
+            <br><br>
 
-<div class="upload-box">
+            {% if video_uploaded %}
+            <h3>Select Audio Track</h3>
+            <br>
+            <select name="audio_track">
+                {% for audio in audio_tracks %}
+                <option value="{{ audio.index }}">{{ audio.lang }}</option>
+                {% endfor %}
+            </select>
+            <br><br>
+            {% endif %}
 
-<form
-method="POST"
-enctype="multipart/form-data">
+            <button type="submit">
+                {% if video_uploaded %}Play Video{% else %}Upload Video{% endif %}
+            </button>
+        </form>
+    </div>
 
-<h3>Select Video</h3>
+    <!-- VIDEO PLAYER -->
+    {% if output_video %}
 
-<br>
+    <video id="player" playsinline controls>
+        <source
+            src="{{ url_for('static', filename='output/' + output_video) }}"
+            type="video/mp4">
 
-<input
-type="file"
-name="video"
-accept="video/*"
-required>
+        {% for track in subtitle_tracks %}
+        <track
+            kind="subtitles"
+            label="{{ track.lang }}"
+            srclang="{{ track.lang }}"
+            src="{{ url_for('static', filename='subtitles/' + track.file) }}">
+        {% endfor %}
+    </video>
 
-<br><br>
+    <!-- EXTERNAL SUBTITLE + SR TOGGLE -->
+    <div class="subtitle-panel">
+        <h3>Upload External Subtitle</h3>
+        <br>
+        <input type="file" id="subtitleInput" accept=".srt,.ass,.ssa,.vtt">
+        <button type="button" onclick="uploadSubtitle()">Add Subtitle</button>
 
-{% if video_uploaded %}
+        <!-- ── NEW: Screen reader announcement toggle ── -->
+        <div class="sr-toggle-row">
+            <input
+                type="checkbox"
+                id="srAnnouncementToggle"
+                checked
+                onchange="toggleSRAnnouncements(this.checked)"
+                aria-describedby="sr-toggle-desc">
+            <label for="srAnnouncementToggle">
+                Screen reader subtitle announcements
+            </label>
+        </div>
+        <p id="sr-toggle-desc" style="font-size: 13px; color: #aaa; margin-top: 6px;">
+            Subtitles remain visible on screen when this is off.
+        </p>
+        <!-- ── END NEW ── -->
+    </div>
 
-<h3>Select Audio Track</h3>
+    <!-- LIVE SUBTITLE (always visible) -->
+    <div id="live-subtitle"></div>
 
-<br>
+    <!-- SCREEN READER (controlled by toggle) -->
+    <div id="caption-reader" aria-live="assertive" class="sr-only"></div>
 
-<select name="audio_track">
-
-{% for audio in audio_tracks %}
-
-<option value="{{ audio.index }}">
-
-{{ audio.lang }}
-
-</option>
-
-{% endfor %}
-
-</select>
-
-<br><br>
-
-{% endif %}
-
-<button type="submit">
-
-{% if video_uploaded %}
-
-Play Video
-
-{% else %}
-
-Upload Video
-
-{% endif %}
-
-</button>
-
-</form>
-
-</div>
-
-<!-- VIDEO PLAYER -->
-
-{% if output_video %}
-
-<video
-id="player"
-playsinline
-controls>
-
-<source
-src="{{ url_for(
-'static',
-filename='output/' + output_video) }}"
-type="video/mp4">
-
-<!-- EMBEDDED SUBTITLES -->
-
-{% for track in subtitle_tracks %}
-
-<track
-kind="subtitles"
-label="{{ track.lang }}"
-srclang="{{ track.lang }}"
-src="{{ url_for(
-'static',
-filename='subtitles/' + track.file) }}">
-
-{% endfor %}
-
-</video>
-
-<!-- EXTERNAL SUBTITLE -->
-
-<div class="subtitle-panel">
-
-<h3>Upload External Subtitle</h3>
-
-<br>
-
-<input
-type="file"
-id="subtitleInput"
-accept=".srt,.ass,.ssa,.vtt">
-
-<button
-type="button"
-onclick="uploadSubtitle()">
-
-Add Subtitle
-
-</button>
-
-</div>
-
-<!-- LIVE SUBTITLE -->
-
-<div id="live-subtitle"></div>
-
-<!-- SCREEN READER -->
-
-<div
-id="caption-reader"
-aria-live="assertive"
-class="sr-only">
-</div>
-
-{% endif %}
+    {% endif %}
 
 </div>
 
 <!-- PLYR -->
-
-<script
-src="https://cdn.plyr.io/3.7.8/plyr.polyfilled.js">
-</script>
+<script src="https://cdn.plyr.io/3.7.8/plyr.polyfilled.js"></script>
 
 <script>
 
-const video =
-document.getElementById("player");
+const video          = document.getElementById("player");
+const captionReader  = document.getElementById("caption-reader");
+const liveSubtitle   = document.getElementById("live-subtitle");
 
-const captionReader =
-document.getElementById(
-    "caption-reader"
-);
-
-const liveSubtitle =
-document.getElementById(
-    "live-subtitle"
-);
+// ── NEW: tracks whether SR announcements are enabled ──
+let srAnnouncementsEnabled = true;
+function htmlToText(html) {
+    const div = document.createElement("div");
+    div.innerHTML = html;
+    return div.textContent || "";
+}
+function toggleSRAnnouncements(enabled) {
+    srAnnouncementsEnabled = enabled;
+    // If turned off, clear any current announcement immediately
+    if (!enabled) {
+        captionReader.textContent = "";
+    }
+}
+// ── END NEW ──
 
 
 // INIT PLAYER
+if (video) {
 
-if(video){
-
-    const player = new Plyr(
-
-        '#player',
-
-        {
-
-            controls: [
-
-                'play-large',
-                'restart',
-                'rewind',
-                'play',
-                'fast-forward',
-                'progress',
-                'current-time',
-                'duration',
-                'mute',
-                'volume',
-                'captions',
-                'settings',
-                'pip',
-                'fullscreen'
-
-            ],
-
-            settings: [
-
-                'captions',
-                'speed'
-
-            ],
-
-            speed: {
-
-                selected:1,
-
-                options:[
-                    0.5,
-                    0.75,
-                    1,
-                    1.25,
-                    1.5,
-                    1.75,
-                    2
-                ]
-
-            },
-
-            captions: {
-
-                active:true,
-                update:true
-
-            },
-
-            keyboard: {
-
-                focused:true,
-                global:true
-
-            }
-
-        }
-
-    );
-
-    // ACCESSIBILITY FOR EMBEDDED SUBS
+    const player = new Plyr('#player', {
+        controls: [
+            'play-large', 'restart', 'rewind', 'play', 'fast-forward',
+            'progress', 'current-time', 'duration', 'mute', 'volume',
+            'captions', 'settings', 'pip', 'fullscreen'
+        ],
+        settings: ['captions', 'speed'],
+        speed: {
+            selected: 1,
+            options: [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
+        },
+        captions: { active: true, update: true },
+        keyboard: { focused: true, global: true }
+    });
 
     setupAccessibility();
-
 }
 
 
 // ACCESSIBILITY FUNCTION
+function setupAccessibility() {
 
-function setupAccessibility(){
+    for (let i = 0; i < video.textTracks.length; i++) {
 
-    for(
-
-        let i = 0;
-
-        i < video.textTracks.length;
-
-        i++
-
-    ){
-
-        const track =
-        video.textTracks[i];
-
+        const track = video.textTracks[i];
         track.mode = "showing";
 
-        track.addEventListener(
+        track.addEventListener("cuechange", () => {
 
-            "cuechange",
+            const cue = track.activeCues[0];
 
-            () => {
+            if (cue) {
+                // Always update the visible subtitle
+                liveSubtitle.innerHTML = cue.text;
 
-                const cue =
-                track.activeCues[0];
-
-                if(cue){
-
-                    captionReader.textContent =
-                    cue.text;
-
-                    liveSubtitle.innerHTML =
-                    cue.text;
-
+                // Only announce to screen reader when enabled ── MODIFIED
+                if (srAnnouncementsEnabled) {
+                    captionReader.textContent = htmlToText(cue.text);
                 }
-
             }
-
-        );
-
+        });
     }
-
 }
 
 
 // EXTERNAL SUBTITLE UPLOAD
+async function uploadSubtitle() {
 
-async function uploadSubtitle(){
+    const fileInput = document.getElementById("subtitleInput");
+    const file = fileInput.files[0];
 
-    const fileInput =
-    document.getElementById(
-        "subtitleInput"
-    );
-
-    const file =
-    fileInput.files[0];
-
-    if(!file){
-
+    if (!file) {
         alert("Select subtitle file");
-
         return;
-
     }
 
-    const formData =
-    new FormData();
+    const formData = new FormData();
+    formData.append("subtitle", file);
 
-    formData.append(
-        "subtitle",
-        file
-    );
+    const response = await fetch("/upload_subtitle", {
+        method: "POST",
+        body: formData
+    });
 
-    const response =
-    await fetch(
+    const data = await response.json();
 
-        "/upload_subtitle",
-
-        {
-
-            method:"POST",
-
-            body:formData
-
-        }
-
-    );
-
-    const data =
-    await response.json();
-
-    const track =
-    document.createElement("track");
-
-    track.kind = "subtitles";
-
-    track.label = data.lang;
-
-    track.srclang = data.lang;
-
-    track.src =
-    "/static/subtitles/" +
-    data.file;
-
-    track.default = true;
+    const track      = document.createElement("track");
+    track.kind       = "subtitles";
+    track.label      = data.lang;
+    track.srclang    = data.lang;
+    track.src        = "/static/subtitles/" + data.file;
+    track.default    = true;
 
     video.appendChild(track);
 
-    // WAIT FOR TRACK TO LOAD
+    track.addEventListener("load", () => {
 
-    track.addEventListener(
+        const textTrack = video.textTracks[video.textTracks.length - 1];
+        textTrack.mode  = "showing";
 
-        "load",
+        textTrack.addEventListener("cuechange", () => {
 
-        () => {
+            const cue = textTrack.activeCues[0];
 
-            const textTrack =
-            video.textTracks[
-                video.textTracks.length - 1
-            ];
+            if (cue) {
+                // Always update the visible subtitle
+                liveSubtitle.innerHTML = cue.text;
 
-            textTrack.mode =
-            "showing";
-
-            textTrack.addEventListener(
-
-                "cuechange",
-
-                () => {
-
-                    const cue =
-                    textTrack.activeCues[0];
-
-                    if(cue){
-
-                        captionReader.textContent =
-                        cue.text;
-
-                        liveSubtitle.innerHTML =
-                        cue.text;
-
-                    }
-
+                // Only announce to screen reader when enabled ── MODIFIED
+                if (srAnnouncementsEnabled) {
+                    captionReader.textContent = cue.text;
                 }
-
-            );
-
-        }
-
-    );
+            }
+        });
+    });
 
     alert("Subtitle Added");
-
 }
 
 </script>
-
 </body>
 </html>
